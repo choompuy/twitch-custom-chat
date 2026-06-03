@@ -1,0 +1,227 @@
+:root {
+  --panel-bg: #0a0a0a;
+
+  --z-background: 1;
+  --z-overlay: 2;
+  --z-content: 3;
+
+  --radius-user: 6px;
+  --radius-message: 4px 4px 16px 16px;
+
+  --username-corner-top-left: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/username-corner-top-left.png");
+  --username-mask: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/username-mask.png");
+  --message-corner-top-right: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/message-corner-top-right.png");
+  --message-corner-bottom-left: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/message-corner-bottom-left.png");
+  --message-mask: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/message-mask.png");
+  --fog-top: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/fog-top.png");
+  --fog-bottom: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/fog-bottom.png");
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  font-family: "SN Pro", sans-serif;
+}
+
+#chat {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  height: 100%;
+  padding-bottom: 6px;
+  padding-inline: 4px;
+  gap: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.message {
+  position: relative;
+  animation: messageEnter 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top left;
+}
+
+@keyframes messageEnter {
+  0% {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.message-removing {
+  animation: messageExit 300ms ease forwards;
+}
+
+@keyframes messageExit {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+}
+
+.chat-emote {
+  display: inline-block;
+  width: auto;
+  height: 28px;
+  max-height: 28px;
+  vertical-align: middle;
+  image-rendering: auto;
+}
+
+.username-wrapper {
+  position: absolute;
+  display: inline-flex;
+  max-width: 90%;
+  top: -8px;
+  margin-left: 6px;
+  padding: 2px;
+  border-radius: var(--radius-user);
+  background: linear-gradient(39deg, #302f2f 0%, #7d7777 21%, #2a2a2a 58%, #4d4745 100%);
+  z-index: var(--z-content);
+}
+
+.username-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeat-x var(--username-mask);
+  background-size: contain;
+  pointer-events: none;
+  z-index: var(--z-overlay);
+}
+
+.username-corner-top-left {
+  position: absolute;
+  top: -6px;
+  left: -4px;
+  width: 23px;
+  height: 30px;
+  background: no-repeat var(--username-corner-top-left);
+  background-size: contain;
+  pointer-events: none;
+  z-index: var(--z-content);
+}
+
+.username {
+  display: flex;
+  align-items: center;
+  border-radius: inherit;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 4px;
+  padding: 4px;
+  padding-left: 8px;
+  background: var(--panel-bg);
+}
+
+.badges img {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.username-text {
+  padding: 4px 8px 4px 6px;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 4px currentColor;
+  text-wrap-mode: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.message-panel {
+  position: relative;
+  padding: 2px;
+  border-radius: var(--radius-message);
+  background: linear-gradient(50deg, #302f2f 0%, #5c5554 19%, #2a2a2a 48%, #353230 74%, #969393 100%);
+}
+
+.message-panel::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 48px;
+  height: 60px;
+  background: no-repeat var(--message-corner-top-right);
+  background-size: contain;
+  pointer-events: none;
+  z-index: var(--z-overlay);
+}
+
+.message-panel::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: -6px;
+  width: 121px;
+  height: 70px;
+  background: no-repeat var(--message-corner-bottom-left);
+  background-size: contain;
+  pointer-events: none;
+  z-index: var(--z-overlay);
+}
+
+.text-wrapper {
+  position: relative;
+  padding: 28px 14px 14px;
+  border-radius: inherit;
+  background: var(--panel-bg);
+  color: #fff;
+  overflow: hidden;
+}
+
+.text-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeat-y var(--message-mask);
+  background-size: cover;
+  pointer-events: none;
+  z-index: var(--z-overlay);
+}
+
+.text-top,
+.text-bottom {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: var(--z-background);
+}
+
+.text-top {
+  background: no-repeat top center var(--fog-top);
+  background-size: cover;
+}
+
+.text-bottom {
+  background: no-repeat bottom center var(--fog-bottom);
+  background-size: cover;
+}
+
+.text {
+  position: relative;
+  z-index: var(--z-content);
+  line-height: 1.4;
+  word-break: break-word;
+}
