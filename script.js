@@ -37,6 +37,9 @@ function flushQueue() {
   for (const data of toRender) fragment.appendChild(createMessage(data));
 
   chat.appendChild(fragment);
+  while (chat.children.length > MAX_MESSAGES) {
+    recycleNode(chat.firstElementChild);
+  }
 }
 
 function getNode() {
@@ -59,6 +62,7 @@ function getNode() {
 
 function recycleNode(node) {
   clearTimeout(node._timeoutId);
+  node._timeoutId = null;
   clearTimeout(node._innerTimeoutId);
   node._innerTimeoutId = null;
 
@@ -82,7 +86,7 @@ function getBadges(badges) {
     let cached = badgeCache.get(badge.url);
 
     if (!cached) {
-      cached = `<img class="chat-badge" src="${badge.url}" alt="">`;
+      cached = `<img class="chat-badge" src="${escapeHtml(badge.url)}" alt="">`;
       badgeCache.set(badge.url, cached);
     }
 
@@ -107,7 +111,7 @@ function renderMessageContent(text, emotes = []) {
     result += escapeHtml(text.slice(lastIndex, emote.start));
 
     const src = emote.urls?.["1"] ?? emote.urls?.["2"] ?? emote.urls?.["4"] ?? "";
-    result += `<img class="chat-emote" src="${src}" alt="${emote.name}">`;
+    result += `<img class="chat-emote" src="${escapeHtml(src)}" alt="${escapeHtml(emote.name)}">`;
 
     lastIndex = emote.end + 1;
   }
@@ -130,16 +134,16 @@ function createMessage(data) {
 
   text.innerHTML = renderMessageContent(data.text, data.emotes);
 
-  return message;
-
-  if (chat.children.length > MAX_MESSAGES) {
-    recycleNode(chat.firstElementChild);
-  }
+  message._msgId = Date.now() + Math.random();
+  const id = message._msgId;
 
   message._timeoutId = setTimeout(() => {
+    if (message._msgId !== id) return;
     message.classList.add("message-removing");
     message._innerTimeoutId = setTimeout(() => {
       if (message.parentNode) recycleNode(message);
     }, 300);
   }, MESSAGE_LIFETIME);
+
+  return message;
 }
