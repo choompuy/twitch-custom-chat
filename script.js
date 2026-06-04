@@ -1,43 +1,104 @@
 const MAX_MESSAGES = 10;
-const MESSAGE_LIFETIME = 150000;
+const MESSAGE_LIFETIME = 15000;
 const DEFAULT_COLOR = "#00ff88";
+const USER_BLACKLIST = new Set(["streamelements", "nightbot", "moobot", "wizebot", "streamlabs"]);
 
 const chat = document.getElementById("chat");
 const template = document.getElementById("message-template");
+const _escapeDiv = document.createElement("div");
 const badgeCache = new Map();
+const nodePool = [];
+let messageQueue = [];
+let rafPending = false;
 
 window.addEventListener("onEventReceived", ({ detail }) => {
   if (detail.listener !== "message") return;
 
-  renderMessage(detail.event.data);
+  const data = detail.event.data;
+  const username = (data.nick || data.displayName || "").toLowerCase();
+  if (USER_BLACKLIST.has(username)) return;
+
+  messageQueue.push(data);
+
+  if (!rafPending) {
+    rafPending = true;
+    requestAnimationFrame(flushQueue);
+  }
 });
 
-function getBadgesHTML(badges) {
+function flushQueue() {
+  rafPending = false;
+  const start = Math.max(0, messageQueue.length - MAX_MESSAGES);
+  const toRender = messageQueue.slice(start);
+  messageQueue.length = 0;
+
+  const fragment = document.createDocumentFragment();
+
+  for (const data of toRender) fragment.appendChild(createMessage(data));
+
+  chat.appendChild(fragment);
+}
+
+function getNode() {
+  if (nodePool.length) {
+    const n = nodePool.pop();
+    n.classList.remove("message-removing");
+    return n;
+  }
+
+  const node = template.content.firstElementChild.cloneNode(true);
+  node._refs = {
+    username: node.querySelector(".username"),
+    usernameText: node.querySelector(".username-text"),
+    badges: node.querySelector(".badges"),
+    text: node.querySelector(".text"),
+  };
+
+  return node;
+}
+
+function recycleNode(node) {
+  clearTimeout(node._timeoutId);
+  clearTimeout(node._innerTimeoutId);
+  node._innerTimeoutId = null;
+
+  const refs = node._refs;
+  refs.username.style.color = "";
+  refs.username.style.removeProperty("--user-color");
+  refs.usernameText.innerHTML = "";
+  refs.badges.innerHTML = "";
+  refs.text.innerHTML = "";
+  node.remove();
+
+  if (nodePool.length < MAX_MESSAGES) nodePool.push(node);
+}
+
+function getBadges(badges) {
   if (!badges?.length) return "";
+  if (badgeCache.size > 500) badgeCache.clear();
 
-  const key = badges.map((b) => b.url).join("|");
+  let result = "";
+  for (const badge of badges) {
+    let cached = badgeCache.get(badge.url);
 
-  let html = badgeCache.get(key);
+    if (!cached) {
+      cached = `<img class="chat-badge" src="${badge.url}" alt="">`;
+      badgeCache.set(badge.url, cached);
+    }
 
-  if (html) return html;
+    result += cached;
+  }
 
-  html = badges.map((b) => `<img src="${b.url}" alt="">`).join("");
-
-  badgeCache.set(key, html);
-
-  return html;
+  return result;
 }
 
 function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
+  _escapeDiv.textContent = str;
+  return _escapeDiv.innerHTML;
 }
 
 function renderMessageContent(text, emotes = []) {
-  if (!emotes.length) {
-    return escapeHtml(text);
-  }
+  if (!emotes.length) return escapeHtml(text);
 
   let result = "";
   let lastIndex = 0;
@@ -45,84 +106,40 @@ function renderMessageContent(text, emotes = []) {
   for (const emote of emotes) {
     result += escapeHtml(text.slice(lastIndex, emote.start));
 
-    result += `
-      <img
-        class="chat-emote"
-        src="${emote.urls["1"] || emote.urls["2"] || emote.urls["4"]}"
-        alt="${emote.name}"
-      >
-    `;
+    const src = emote.urls?.["1"] ?? emote.urls?.["2"] ?? emote.urls?.["4"] ?? "";
+    result += `<img class="chat-emote" src="${src}" alt="${emote.name}">`;
 
     lastIndex = emote.end + 1;
   }
 
   result += escapeHtml(text.slice(lastIndex));
-
   return result;
 }
 
-function renderMessage(data) {
+function createMessage(data) {
   const color = data.displayColor || DEFAULT_COLOR;
+  const message = getNode();
 
-  const message = template.content.firstElementChild.cloneNode(true);
-
-  // -------------------------
-  // Cached nodes
-  // -------------------------
-
-  message.dataset.created = Date.now();
-
-  const username = message.querySelector(".username");
-
-  const usernameText = message.querySelector(".username-text");
-
-  const badges = message.querySelector(".badges");
-
-  const text = message.querySelector(".text");
-
-  // -------------------------
-  // Username
-  // -------------------------
+  const { username, usernameText, badges, text } = message._refs;
 
   username.style.color = color;
-
-  username.style.backgroundColor = `color-mix(in srgb, #000000 100%, ${color} 30%)`;
-
+  username.style.setProperty("--user-color", color);
   usernameText.textContent = data.displayName || "";
 
-  // -------------------------
-  // Badges
-  // -------------------------
-
-  badges.innerHTML = getBadgesHTML(data.badges);
-
-  // -------------------------
-  // Message text
-  // -------------------------
+  badges.innerHTML = getBadges(data.badges);
 
   text.innerHTML = renderMessageContent(data.text, data.emotes);
 
-  // -------------------------
-  // Add to DOM
-  // -------------------------
+  return message;
 
-  chat.appendChild(message);
-
-  // -------------------------
-  // Remove old messages
-  // -------------------------
-
-  while (chat.children.length > MAX_MESSAGES) {
-    chat.firstElementChild.remove();
+  if (chat.children.length > MAX_MESSAGES) {
+    recycleNode(chat.firstElementChild);
   }
+
+  message._timeoutId = setTimeout(() => {
+    message.classList.add("message-removing");
+    message._innerTimeoutId = setTimeout(() => {
+      if (message.parentNode) recycleNode(message);
+    }, 300);
+  }, MESSAGE_LIFETIME);
 }
-
-setInterval(() => {
-  const now = Date.now();
-
-  for (const message of chat.children) {
-    if (now - Number(message.dataset.created) > MESSAGE_LIFETIME) {
-      message.classList.add("message-removing");
-    }
-  }
-}, 1000);

@@ -30,17 +30,16 @@ body {
   justify-content: flex-end;
   width: 100%;
   height: 100%;
-  padding-bottom: 6px;
-  padding-inline: 4px;
-  gap: 16px;
   box-sizing: border-box;
   overflow: hidden;
 }
 
 .message {
   position: relative;
-  animation: messageEnter 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  padding: 14px 4px 6px;
+  animation: messageEnter 300ms ease;
   transform-origin: top left;
+  contain: layout paint;
 }
 
 @keyframes messageEnter {
@@ -84,7 +83,7 @@ body {
   position: absolute;
   display: inline-flex;
   max-width: 90%;
-  top: -8px;
+  top: 6px;
   margin-left: 6px;
   padding: 2px;
   border-radius: var(--radius-user);
@@ -103,7 +102,8 @@ body {
   z-index: var(--z-overlay);
 }
 
-.username-corner-top-left {
+.username-wrapper::after {
+  content: "";
   position: absolute;
   top: -6px;
   left: -4px;
@@ -119,6 +119,7 @@ body {
   display: flex;
   align-items: center;
   border-radius: inherit;
+  background: color-mix(in srgb, #000 100%, var(--user-color) 30%);
   font-weight: 700;
   overflow: hidden;
 }
@@ -142,7 +143,7 @@ body {
 .username-text {
   padding: 4px 8px 4px 6px;
   text-overflow: ellipsis;
-  text-shadow: 0 0 4px currentColor;
+  text-shadow: 0 0 8px currentColor;
   text-wrap-mode: nowrap;
   white-space: nowrap;
   overflow: hidden;
@@ -183,21 +184,20 @@ body {
 
 .text-wrapper {
   position: relative;
-  padding: 28px 14px 14px;
+  padding: 28px 12px 10px;
   border-radius: inherit;
   background: var(--panel-bg);
   color: #fff;
   overflow: hidden;
 }
 
-.text-wrapper::after {
+.text-wrapper::before {
   content: "";
   position: absolute;
   inset: 0;
   background: repeat-y var(--message-mask);
-  background-size: cover;
+  background-size: 100% auto;
   pointer-events: none;
-  z-index: var(--z-overlay);
 }
 
 .text-top,
@@ -211,12 +211,12 @@ body {
 
 .text-top {
   background: no-repeat top center var(--fog-top);
-  background-size: cover;
+  background-size: 100% auto;
 }
 
 .text-bottom {
   background: no-repeat bottom center var(--fog-bottom);
-  background-size: cover;
+  background-size: 100% auto;
 }
 
 .text {
