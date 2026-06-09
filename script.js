@@ -1,13 +1,17 @@
 const MAX_MESSAGES = 10;
 const MESSAGE_LIFETIME = 15000;
 const DEFAULT_COLOR = "#00ff88";
+const BADGE_CACHE_LIMIT = 200;
+
 const USER_BLACKLIST = new Set(["streamelements", "nightbot", "moobot", "wizebot", "streamlabs", "jeetbot", "vsestream"]);
 
 const chat = document.getElementById("chat");
 const template = document.getElementById("message-template");
+
 const _escapeDiv = document.createElement("div");
 const badgeCache = new Map();
 const nodePool = [];
+
 let messageQueue = [];
 let rafPending = false;
 
@@ -15,15 +19,12 @@ window.addEventListener("onEventReceived", ({ detail }) => {
   const { listener } = detail;
 
   if (listener === "message") {
-    const data = detail.event.data;
+    const { data } = detail.event;
     const username = (data.nick || data.displayName || "").toLowerCase();
 
     if (USER_BLACKLIST.has(username)) return;
 
-    messageQueue.push({
-      kind: "message",
-      data,
-    });
+    messageQueue.push(data);
   }
 
   if (!rafPending) {
@@ -34,15 +35,14 @@ window.addEventListener("onEventReceived", ({ detail }) => {
 
 function flushQueue() {
   rafPending = false;
-  const start = Math.max(0, messageQueue.length - MAX_MESSAGES);
-  const toRender = messageQueue.slice(start);
-  messageQueue.length = 0;
+
+  const batch = messageQueue.splice(Math.max(0, messageQueue.length - MAX_MESSAGES));
 
   const fragment = document.createDocumentFragment();
-
-  for (const item of toRender) fragment.appendChild(createMessage(item.data));
+  for (const data of batch) fragment.appendChild(createMessage(data));
 
   chat.appendChild(fragment);
+
   while (chat.children.length > MAX_MESSAGES) {
     recycleNode(chat.firstElementChild);
   }
@@ -50,22 +50,55 @@ function flushQueue() {
 
 function getNode() {
   if (nodePool.length) {
-    const n = nodePool.pop();
-    n.classList.remove("message-removing");
-    return n;
+    const node = nodePool.pop();
+    node.classList.remove("message-removing");
+    return node;
   }
 
   const node = template.content.firstElementChild.cloneNode(true);
+
   node._refs = {
     username: node.querySelector(".username"),
     usernameText: node.querySelector(".username-text"),
     badges: node.querySelector(".badges"),
     text: node.querySelector(".text"),
-    eventWrapper: node.querySelector(".event-wrapper"),
     eventText: node.querySelector(".event-text"),
   };
 
   return node;
+}
+
+function recycleNode(node) {
+  clearTimeout(node._timeoutId);
+  clearTimeout(node._exitTimeoutId);
+
+  const { username, usernameText, badges, text, eventText } = node._refs;
+
+  node.classList.remove("with-event");
+  username.style.cssText = "";
+  usernameText.textContent = "";
+  badges.innerHTML = "";
+  text.innerHTML = "";
+  eventText.textContent = "";
+
+  node.remove();
+
+  if (nodePool.length < MAX_MESSAGES) nodePool.push(node);
+}
+
+function setupRemoval(node) {
+  const token = Symbol();
+  node._removalToken = token;
+
+  node._timeoutId = setTimeout(() => {
+    if (node._removalToken !== token) return;
+
+    node.classList.add("message-removing");
+
+    node._exitTimeoutId = setTimeout(() => {
+      if (node.parentNode) recycleNode(node);
+    }, 300);
+  }, MESSAGE_LIFETIME);
 }
 
 function escapeHtml(str) {
@@ -73,46 +106,13 @@ function escapeHtml(str) {
   return _escapeDiv.innerHTML;
 }
 
-function recycleNode(node) {
-  clearTimeout(node._timeoutId);
-  node._timeoutId = null;
-  clearTimeout(node._innerTimeoutId);
-  node._innerTimeoutId = null;
-
-  const refs = node._refs;
-  refs.username.style.color = "";
-  refs.username.style.removeProperty("--user-color");
-  refs.usernameText.innerHTML = "";
-  refs.badges.innerHTML = "";
-  refs.text.innerHTML = "";
-  refs.eventWrapper.hidden = true;
-  refs.eventText.innerHTML = "";
-  node.remove();
-
-  if (nodePool.length < MAX_MESSAGES) nodePool.push(node);
-}
-
-function setupRemoval(message) {
-  message._msgId = Date.now() + Math.random();
-
-  const id = message._msgId;
-
-  message._timeoutId = setTimeout(() => {
-    if (message._msgId !== id) return;
-
-    message.classList.add("message-removing");
-
-    message._innerTimeoutId = setTimeout(() => {
-      if (message.parentNode) recycleNode(message);
-    }, 300);
-  }, MESSAGE_LIFETIME);
-}
-
 function getBadges(badges) {
   if (!badges?.length) return "";
-  if (badgeCache.size > 500) badgeCache.clear();
 
-  let result = "";
+  if (badgeCache.size >= BADGE_CACHE_LIMIT) badgeCache.clear();
+
+  let html = "";
+
   for (const badge of badges) {
     let cached = badgeCache.get(badge.url);
 
@@ -121,51 +121,48 @@ function getBadges(badges) {
       badgeCache.set(badge.url, cached);
     }
 
-    result += cached;
+    html += cached;
   }
 
-  return result;
+  return html;
 }
 
 function renderMessageContent(text, emotes = []) {
   if (!emotes.length) return escapeHtml(text);
 
-  let result = "";
-  let lastIndex = 0;
+  let html = "";
+  let cursor = 0;
 
   for (const emote of emotes) {
-    result += escapeHtml(text.slice(lastIndex, emote.start));
+    html += escapeHtml(text.slice(cursor, emote.start));
 
     const src = emote.urls?.["1"] ?? emote.urls?.["2"] ?? emote.urls?.["4"] ?? "";
-    result += `<img class="chat-emote" src="${escapeHtml(src)}" alt="${escapeHtml(emote.name)}">`;
+    html += `<img class="chat-emote" src="${escapeHtml(src)}" alt="${escapeHtml(emote.name)}">`;
 
-    lastIndex = emote.end + 1;
+    cursor = emote.end + 1;
   }
 
-  result += escapeHtml(text.slice(lastIndex));
-  return result;
+  html += escapeHtml(text.slice(cursor));
+  return html;
 }
 
 function createMessage(data) {
   const color = data.displayColor || DEFAULT_COLOR;
-  const message = getNode();
-
-  const { username, usernameText, badges, text, eventWrapper, eventText } = message._refs;
+  const node = getNode();
+  const { username, usernameText, badges, text, eventText } = node._refs;
 
   username.style.color = color;
   username.style.setProperty("--user-color", color);
-
   usernameText.textContent = data.displayName || "";
-
   badges.innerHTML = getBadges(data.badges);
-
-  const isFirstMessage = data.tags?.["first-msg"] === "1";
-  eventWrapper.hidden = !isFirstMessage;
-  eventText.textContent = isFirstMessage ? "first message" : "";
-
   text.innerHTML = renderMessageContent(data.text, data.emotes);
 
-  setupRemoval(message);
+  if (data.tags?.["first-msg"] === "1") {
+    node.classList.add("with-event");
+    eventText.textContent = "first message";
+  }
 
-  return message;
+  setupRemoval(node);
+
+  return node;
 }

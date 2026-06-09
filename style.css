@@ -38,18 +38,26 @@ body {
 .message {
   position: relative;
   padding: 14px 4px 6px;
+  contain: layout style paint;
   animation: messageEnter 300ms ease;
   transform-origin: top left;
-  contain: layout paint;
+}
+
+.with-event {
+  padding: 14px 4px 12px;
+}
+
+.with-event .event-wrapper {
+  display: flex;
 }
 
 @keyframes messageEnter {
-  0% {
+  from {
     opacity: 0;
     transform: translateX(30px);
   }
 
-  100% {
+  to {
     opacity: 1;
     transform: translateX(0);
   }
@@ -79,6 +87,8 @@ body {
   vertical-align: middle;
   image-rendering: auto;
 }
+
+/* --- Username --- */
 
 .username-wrapper {
   position: absolute;
@@ -130,8 +140,7 @@ body {
   align-items: center;
   height: 100%;
   gap: 4px;
-  padding: 4px;
-  padding-left: 8px;
+  padding: 4px 4px 4px 8px;
   background: var(--panel-bg);
 }
 
@@ -145,10 +154,12 @@ body {
   padding: 4px 8px 4px 6px;
   text-overflow: ellipsis;
   text-shadow: 0 0 8px currentColor;
-  text-wrap-mode: nowrap;
+  text-wrap: nowrap;
   white-space: nowrap;
   overflow: hidden;
 }
+
+/* --- Message panel --- */
 
 .message-panel {
   position: relative;
@@ -227,13 +238,18 @@ body {
   word-break: break-word;
 }
 
+/* --- Event badge --- */
+
 .event-wrapper {
   position: absolute;
-  display: flex;
+  display: none;
+  justify-content: center;
+  align-items: center;
   bottom: 0;
   right: 4px;
-  width: 126px;
+  width: auto;
   height: 26px;
+  aspect-ratio: 256 / 53;
   background: no-repeat var(--bookmark);
   background-size: contain;
   pointer-events: none;
@@ -241,6 +257,9 @@ body {
 }
 
 .event-text {
+  padding-left: 6px;
   color: #fff;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
