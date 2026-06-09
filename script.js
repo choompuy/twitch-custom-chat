@@ -1,7 +1,7 @@
 const MAX_MESSAGES = 10;
 const MESSAGE_LIFETIME = 15000;
 const DEFAULT_COLOR = "#00ff88";
-const USER_BLACKLIST = new Set(["streamelements", "nightbot", "moobot", "wizebot", "streamlabs"]);
+const USER_BLACKLIST = new Set(["streamelements", "nightbot", "moobot", "wizebot", "streamlabs", "jeetbot", "vsestream"]);
 
 const chat = document.getElementById("chat");
 const template = document.getElementById("message-template");
@@ -12,13 +12,19 @@ let messageQueue = [];
 let rafPending = false;
 
 window.addEventListener("onEventReceived", ({ detail }) => {
-  if (detail.listener !== "message") return;
+  const { listener } = detail;
 
-  const data = detail.event.data;
-  const username = (data.nick || data.displayName || "").toLowerCase();
-  if (USER_BLACKLIST.has(username)) return;
+  if (listener === "message") {
+    const data = detail.event.data;
+    const username = (data.nick || data.displayName || "").toLowerCase();
 
-  messageQueue.push(data);
+    if (USER_BLACKLIST.has(username)) return;
+
+    messageQueue.push({
+      kind: "message",
+      data,
+    });
+  }
 
   if (!rafPending) {
     rafPending = true;
@@ -34,7 +40,7 @@ function flushQueue() {
 
   const fragment = document.createDocumentFragment();
 
-  for (const data of toRender) fragment.appendChild(createMessage(data));
+  for (const item of toRender) fragment.appendChild(createMessage(item.data));
 
   chat.appendChild(fragment);
   while (chat.children.length > MAX_MESSAGES) {
@@ -55,9 +61,16 @@ function getNode() {
     usernameText: node.querySelector(".username-text"),
     badges: node.querySelector(".badges"),
     text: node.querySelector(".text"),
+    eventWrapper: node.querySelector(".event-wrapper"),
+    eventText: node.querySelector(".event-text"),
   };
 
   return node;
+}
+
+function escapeHtml(str) {
+  _escapeDiv.textContent = str;
+  return _escapeDiv.innerHTML;
 }
 
 function recycleNode(node) {
@@ -72,9 +85,27 @@ function recycleNode(node) {
   refs.usernameText.innerHTML = "";
   refs.badges.innerHTML = "";
   refs.text.innerHTML = "";
+  refs.eventWrapper.hidden = true;
+  refs.eventText.innerHTML = "";
   node.remove();
 
   if (nodePool.length < MAX_MESSAGES) nodePool.push(node);
+}
+
+function setupRemoval(message) {
+  message._msgId = Date.now() + Math.random();
+
+  const id = message._msgId;
+
+  message._timeoutId = setTimeout(() => {
+    if (message._msgId !== id) return;
+
+    message.classList.add("message-removing");
+
+    message._innerTimeoutId = setTimeout(() => {
+      if (message.parentNode) recycleNode(message);
+    }, 300);
+  }, MESSAGE_LIFETIME);
 }
 
 function getBadges(badges) {
@@ -94,11 +125,6 @@ function getBadges(badges) {
   }
 
   return result;
-}
-
-function escapeHtml(str) {
-  _escapeDiv.textContent = str;
-  return _escapeDiv.innerHTML;
 }
 
 function renderMessageContent(text, emotes = []) {
@@ -124,26 +150,22 @@ function createMessage(data) {
   const color = data.displayColor || DEFAULT_COLOR;
   const message = getNode();
 
-  const { username, usernameText, badges, text } = message._refs;
+  const { username, usernameText, badges, text, eventWrapper, eventText } = message._refs;
 
   username.style.color = color;
   username.style.setProperty("--user-color", color);
+
   usernameText.textContent = data.displayName || "";
 
   badges.innerHTML = getBadges(data.badges);
 
+  const isFirstMessage = data.tags?.["first-msg"] === "1";
+  eventWrapper.hidden = !isFirstMessage;
+  eventText.textContent = isFirstMessage ? "first message" : "";
+
   text.innerHTML = renderMessageContent(data.text, data.emotes);
 
-  message._msgId = Date.now() + Math.random();
-  const id = message._msgId;
-
-  message._timeoutId = setTimeout(() => {
-    if (message._msgId !== id) return;
-    message.classList.add("message-removing");
-    message._innerTimeoutId = setTimeout(() => {
-      if (message.parentNode) recycleNode(message);
-    }, 300);
-  }, MESSAGE_LIFETIME);
+  setupRemoval(message);
 
   return message;
 }

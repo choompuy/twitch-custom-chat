@@ -15,6 +15,7 @@
   --message-mask: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/message-mask.png");
   --fog-top: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/fog-top.png");
   --fog-bottom: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/fog-bottom.png");
+  --bookmark: url("https://cdn.jsdelivr.net/gh/choompuy/twitch-custom-chat/assets/bookmark.png");
 }
 
 body {
@@ -224,4 +225,22 @@ body {
   z-index: var(--z-content);
   line-height: 1.4;
   word-break: break-word;
+}
+
+.event-wrapper {
+  position: absolute;
+  display: flex;
+  bottom: 0;
+  right: 4px;
+  width: 126px;
+  height: 26px;
+  background: no-repeat var(--bookmark);
+  background-size: contain;
+  pointer-events: none;
+  z-index: var(--z-content);
+}
+
+.event-text {
+  color: #fff;
+  font-size: 14px;
 }
