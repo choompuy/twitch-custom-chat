@@ -108,7 +108,7 @@ body {
   inset: 0;
   border-radius: inherit;
   background: repeat-x var(--username-mask);
-  background-size: contain;
+  background-size: cover;
   pointer-events: none;
   z-index: var(--z-overlay);
 }
