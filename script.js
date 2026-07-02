@@ -176,12 +176,14 @@ function getBadges(badges) {
 }
 
 function renderMessageContent(text, emotes = []) {
-  if (!emotes.length) return escapeHtml(text);
+  const validEmotes = emotes.filter((e) => Number.isInteger(e.start) && Number.isInteger(e.end) && e.end >= e.start);
+
+  if (!validEmotes.length) return escapeHtml(text);
 
   let html = "";
   let cursor = 0;
 
-  for (const emote of emotes) {
+  for (const emote of validEmotes) {
     html += escapeHtml(text.slice(cursor, emote.start));
     const src = emote.urls?.["1"] ?? emote.urls?.["2"] ?? emote.urls?.["4"] ?? "";
     html += `<img class="chat-emote" src="${escapeHtml(src)}" alt="${escapeHtml(emote.name)}">`;
